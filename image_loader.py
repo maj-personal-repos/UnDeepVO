@@ -3,7 +3,7 @@ from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
 
-def get_stereo_image_generators(train_folder, img_rows=128, img_cols=416, batch_size=16, shuffle=True):
+def get_stereo_image_generators(train_folder, img_rows=256, img_cols=832, batch_size=16, shuffle=True):
     train_imagegen = ImageDataGenerator(rescale=1.0 / 255.0,
                                         rotation_range=5,
                                         shear_range=0.01,
