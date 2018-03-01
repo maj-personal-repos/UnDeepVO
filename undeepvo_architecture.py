@@ -75,11 +75,11 @@ class MaxUnPooling2DArgMax(Layer):
 
 
 def conv2d_relu_batchnorm(channels, kernel_size, inputs):
-    return Activation(activation='relu')(BatchNormalization()(Conv2D(channels, kernel_size=kernel_size)(inputs)))
+    return Activation(activation='relu')(BatchNormalization()(Conv2D(channels, kernel_size=kernel_size, padding='SAME')(inputs)))
 
 
 def deconv2d_relu_batchnorm(channels, kernel_size, inputs):
-    return Activation(activation='relu')(BatchNormalization()(Conv2DTranspose(channels, kernel_size=kernel_size)(inputs)))
+    return Activation(activation='relu')(BatchNormalization()(Conv2DTranspose(channels, kernel_size=kernel_size, padding='SAME')(inputs)))
 
 
 def conv2d_block(channels, kernel_size, inputs):
@@ -90,8 +90,14 @@ def conv2d_block(channels, kernel_size, inputs):
     return MaxPooling2DArgMax()(conv2)
 
 
-def conv2d_block_2(channels, kernel_size, inputs):
-    pass
+def conv2d_block_2(channels, kernel_size, kernel_size_1, inputs):
+    conv1 = conv2d_relu_batchnorm(channels, kernel_size, inputs)
+
+    conv2 = conv2d_relu_batchnorm(channels, kernel_size, conv1)
+
+    conv3 = conv2d_relu_batchnorm(channels, kernel_size, conv2)
+
+    return MaxPooling2DArgMax()(conv3)
 
 
 def deconv2d_block(channels, kernel_size, pool, indices):
@@ -103,8 +109,14 @@ def deconv2d_block(channels, kernel_size, pool, indices):
     return deconv2d_relu_batchnorm(channels, kernel_size, unconv1)
 
 
-def deconv2d_block_2(channels, kernel_size, inputs):
-    pass
+def deconv2d_block_2(channels, kernel_size, kernel_size_1, pool, indices):
+    unpool1 = MaxUnPooling2DArgMax()(pool, indices=indices)
+
+    unconv1 = deconv2d_relu_batchnorm(channels, kernel_size, unpool1)
+
+    unconv2 = deconv2d_relu_batchnorm(channels, kernel_size_1, unconv1)
+
+    return deconv2d_relu_batchnorm(channels, kernel_size_1, unconv2)
 
 
 def get_undeepvo_net(img_rows, img_cols, learning_rate=1e-4):
@@ -122,79 +134,35 @@ def get_undeepvo_net(img_rows, img_cols, learning_rate=1e-4):
 
     cat_image = concatenate([left_image, right_image], axis=3)
 
-    conv1 = conv2d_relu_batchnorm(64, (3, 3), cat_image)
+    conv_block1, indices1 = conv2d_block(32, (7, 7), left_image)
 
-    conv2 = conv2d_relu_batchnorm(64, (3, 3), conv1)
+    conv_block2, indices2 = conv2d_block(64, (5, 5), conv_block1)
 
-    pool1, indices1 = MaxPooling2DArgMax()(conv2)
+    conv_block3, indices3 = conv2d_block(128, (3, 3), conv_block2)
 
-    conv3 = conv2d_relu_batchnorm(128, (3, 3), pool1)
+    conv_block4, indices4 = conv2d_block(256, (3, 3), conv_block3)
 
-    conv4 = conv2d_relu_batchnorm(128, (3, 3), conv3)
+    conv_block5, indices5 = conv2d_block(512, (3, 3), conv_block4)
 
-    pool2, indices2 = MaxPooling2DArgMax()(conv4)
+    conv_block6, indices6 = conv2d_block(512, (3, 3), conv_block5)
 
-    conv5 = conv2d_relu_batchnorm(256, (3, 3), pool2)
+    conv_block7, indices7 = conv2d_block(512, (3, 3), conv_block6)
 
-    conv6 = conv2d_relu_batchnorm(256, (3, 3), conv5)
+    deconv_block7 = deconv2d_block(512, (3, 3), conv_block7, indices6)
 
-    conv7 = conv2d_relu_batchnorm(256, (1, 1), conv6)
+    deconv_block6 = deconv2d_block(512, (3, 3), deconv_block7, indices5)
 
-    pool3, indices3 = MaxPooling2DArgMax()(conv7)
+    deconv_block5 = deconv2d_block(256, (3, 3), deconv_block6, indices4)
 
-    conv8 = conv2d_relu_batchnorm(512, (3, 3), pool3)
+    deconv_block4 = deconv2d_block(128, (3, 3), deconv_block5, indices3)
 
-    conv9 = conv2d_relu_batchnorm(512, (3, 3), conv8)
+    deconv_block3 = deconv2d_block(64, (3, 3), deconv_block4, indices2)
 
-    conv10 = conv2d_relu_batchnorm(512, (1, 1), conv9)
+    deconv_block2 = deconv2d_block(32, (3, 3), deconv_block3, indices1)
 
-    pool4, indices4 = MaxPooling2DArgMax()(conv10)
+    deconv_block1 = deconv2d_relu_batchnorm(16, (3, 3), deconv_block2)
 
-    conv11 = conv2d_relu_batchnorm(512, (3, 3), pool4)
-
-    conv12 = conv2d_relu_batchnorm(512, (3, 3), conv11)
-
-    conv13 = conv2d_relu_batchnorm(512, (1, 1), conv12)
-
-    pool5, indices5 = MaxPooling2DArgMax()(conv13)
-
-    unpool5 = MaxUnPooling2DArgMax()(pool5, indices=indices5)
-
-    unconv13 = deconv2d_relu_batchnorm(512, (1, 1), unpool5)
-
-    unconv12 = deconv2d_relu_batchnorm(512, (3, 3), unconv13)
-
-    unconv11 = deconv2d_relu_batchnorm(512, (3, 3), unconv12)
-
-    unpool4 = MaxUnPooling2DArgMax()(unconv11, indices=indices4)
-
-    unconv10 = deconv2d_relu_batchnorm(512, (1, 1), unpool4)
-
-    unconv9 = deconv2d_relu_batchnorm(512, (3, 3), unconv10)
-
-    unconv8 = deconv2d_relu_batchnorm(512, (3, 3), unconv9)
-
-    unpool3 = MaxUnPooling2DArgMax()(unconv8, indices=indices3)
-
-    unconv7 = deconv2d_relu_batchnorm(256, (1, 1), unpool3)
-
-    unconv6 = deconv2d_relu_batchnorm(256, (3, 3), unconv7)
-
-    unconv5 = deconv2d_relu_batchnorm(256, (3, 3), unconv6)
-
-    unpool2 = MaxUnPooling2DArgMax()(unconv5, indices=indices2)
-
-    unconv4 = deconv2d_relu_batchnorm(128, (3, 3), unpool2)
-
-    unconv3 = deconv2d_relu_batchnorm(128, (3, 3), unconv4)
-
-    unpool1 = MaxUnPooling2DArgMax()(unconv3, indices=indices1)
-
-    unconv2 = deconv2d_relu_batchnorm(64, (3, 3), unpool1)
-
-    unconv1 = deconv2d_relu_batchnorm(1, (3, 3), unconv2)
-
-    model = Model(inputs=inputs, outputs=unconv1)
+    model = Model(inputs=inputs, outputs=deconv_block1)
 
     model.compile(loss=keras.losses.categorical_crossentropy,
                   optimizer=keras.optimizers.Adadelta(),
