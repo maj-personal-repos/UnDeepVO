@@ -4,6 +4,9 @@ data
 #scratch
 scratch
 
+#visualization
+visualization
+
 #IDEs
 .idea
 

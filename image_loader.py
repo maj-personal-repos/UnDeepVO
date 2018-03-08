@@ -1,9 +1,8 @@
-import os
 from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
 
-def get_stereo_image_generators(train_folder, img_rows=256, img_cols=832, batch_size=16, shuffle=True):
+def get_stereo_image_generators(train_folder, img_rows=128, img_cols=512, batch_size=16, shuffle=True):
     train_imagegen = ImageDataGenerator(rescale=1.0 / 255.0,
                                         rotation_range=5,
                                         shear_range=0.01,
@@ -32,10 +31,12 @@ def get_stereo_image_generators(train_folder, img_rows=256, img_cols=832, batch_
             left_image = train_generator_left.next()
             right_image = train_generator_right.next()
 
-            output = np.concatenate((left_image, right_image), axis=2)
+            # output = np.concatenate((left_image, right_image), axis=2)
 
-            yield output, [output, np.zeros(shape=(output.shape[0], img_rows - 4, img_cols - 4)),
-                               np.zeros(shape=(output.shape[0], img_rows - 4, img_cols - 4))]
+            yield [left_image, right_image], [left_image,
+                                              right_image,
+                                              np.zeros(shape=left_image.shape),
+                                              np.zeros(shape=right_image.shape)]
 
     train_generator = train_generator_func()
 
