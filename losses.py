@@ -1,4 +1,4 @@
-from keras.layers import Lambda
+# from keras.layers import Lambda
 from keras.losses import mean_absolute_error
 import keras.backend as K
 
@@ -21,7 +21,8 @@ def ssim(x, y):
 
     ssim_out = ssim_n / ssim_d
 
-    return Lambda(lambda x: K.clip((1-x)/2, 0, 1))(ssim_out)
+    return K.clip((1-ssim_out)/2, 0, 1)
+    # return Lambda(lambda x: K.clip((1-x)/2, 0, 1))(ssim_out)
 
 
 def photometric_consistency_loss(y_true, y_pred):
