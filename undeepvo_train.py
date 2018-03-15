@@ -3,6 +3,8 @@
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 from keras.layers import Input
+from keras.utils import plot_model
+
 from image_loader import get_stereo_image_generators
 from undeepvo_model import UnDeepVOModel
 import argparse
@@ -63,31 +65,33 @@ def main(args):
 
     left_input = Input(input_shape)
 
+    left_input_next = Input(input_shape)
+
     right_input = Input(input_shape)
 
-    udvo = UnDeepVOModel(left_input, right_input, args.learning_rate)
+    udvo = UnDeepVOModel(left_input_next, left_input, right_input, args.learning_rate)
 
-    for epoch in range(epochs):
-        # TODO: need to save model after each epoch
-        # model_path = os.path.join(models_dir, model_name + '_epoch_%d' % epoch)
+    # for epoch in range(epochs):
+    #     # TODO: need to save model after each epoch
+    #     # model_path = os.path.join(models_dir, model_name + '_epoch_%d' % epoch)
+    #
+    #     udvo.model.fit_generator(train_gen,
+    #                              steps_per_epoch=train_samples // batch_size,
+    #                              epochs=epochs,
+    #                              validation_data=test_gen,
+    #                              validation_steps=test_samples // batch_size,
+    #                              verbose=1,
+    #                              # callbacks=[TensorBoard(log_dir=args.log_directory,
+    #                              #                        histogram_freq=True,
+    #                              #                        batch_size=batch_size,
+    #                              #                        write_graph=False,
+    #                              #                        write_grads=True)]
+    #                              )
 
-        udvo.model.fit_generator(train_gen,
-                                 steps_per_epoch=train_samples // batch_size,
-                                 epochs=epochs,
-                                 validation_data=test_gen,
-                                 validation_steps=test_samples // batch_size,
-                                 verbose=1,
-                                 # callbacks=[TensorBoard(log_dir=args.log_directory,
-                                 #                        histogram_freq=True,
-                                 #                        batch_size=batch_size,
-                                 #                        write_graph=False,
-                                 #                        write_grads=True)]
-                                 )
 
+    udvo.model.summary()
 
-# udvo.model.summary()
-#
-# plot_model(udvo.model, show_shapes=True, to_file='scratch/model.png')
+    plot_model(udvo.model, show_shapes=True, to_file='scratch/model.png')
 
 
 if __name__ == '__main__':

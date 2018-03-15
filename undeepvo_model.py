@@ -1,12 +1,13 @@
 from keras.optimizers import Adam
 from keras.models import Model
-from keras.layers import Conv2D, Conv2DTranspose, concatenate, Cropping2D
+from keras.layers import Conv2D, Conv2DTranspose, concatenate, Cropping2D, Dense, Flatten
 from layers import depth_to_disparity, disparity_difference, expand_dims, spatial_transformation
 from losses import photometric_consistency_loss
 
 
 class UnDeepVOModel(object):
-    def __init__(self, left_input, right_input, mode='train', lr=0.1, alpha_image_loss=0.85, img_rows=128, img_cols=512):
+    def __init__(self, left_input_k_1, left_input_k, right_input_k, mode='train', lr=0.1, alpha_image_loss=0.85,
+                 img_rows=128, img_cols=512):
         # NOTE: disparity calculation
         # depth = baseline * focal / disparity
         # depth = 0.54 * 721 / (1242 * disp)
@@ -19,9 +20,11 @@ class UnDeepVOModel(object):
 
         self.focal_length = 718.856 / 1241  # image width = 1241 (note: must scale using this number)
 
-        self.left = left_input
+        self.left = left_input_k
 
-        self.right = right_input
+        self.right = right_input_k
+
+        self.left_next = left_input_k_1
 
         self.left_est = None
 
@@ -45,8 +48,6 @@ class UnDeepVOModel(object):
 
         self.left_to_right_disparity = None
 
-        self.model_input = None
-
         self.model = None
 
         self.depthmap = None
@@ -57,7 +58,9 @@ class UnDeepVOModel(object):
 
         self.alpha_image_loss = alpha_image_loss
 
-        self.build_architecture()
+        self.build_depth_architecture()
+
+        self.build_pose_architecture()
 
         self.build_outputs()
 
@@ -98,11 +101,46 @@ class UnDeepVOModel(object):
     def get_depth(self, input):
         return self.conv(input, 2, 3, 1, 'sigmoid')
 
-    def build_architecture(self):
-        self.model_input = self.left
+    def build_pose_architecture(self):
+        input = concatenate([self.left, self.left_next], axis=3)
 
+        conv1 = self.conv(input, 16, 7, 2, activation='relu')
+
+        conv2 = self.conv(conv1, 32, 5, 2, activation='relu')
+
+        conv3 = self.conv(conv2, 64, 3, 2, activation='relu')
+
+        conv4 = self.conv(conv3, 128, 3, 2, activation='relu')
+
+        conv5 = self.conv(conv4, 256, 3, 2, activation='relu')
+
+        conv6 = self.conv(conv5, 512, 3, 2, activation='relu')
+
+        flat1 = Flatten()(conv6)
+
+        # translation
+
+        fc1_tran = Dense(512, input_shape=(8192,))(flat1)
+
+        fc2_tran = Dense(512, input_shape=(512,))(fc1_tran)
+
+        fc3_tran = Dense(3, input_shape=(512,))(fc2_tran)
+
+        self.translation = fc3_tran
+
+        # rotation
+
+        fc1_rot = Dense(512, input_shape=(512,))(flat1)
+
+        fc2_rot = Dense(512, input_shape=(512,))(fc1_rot)
+
+        fc3_rot = Dense(3, input_shape=(512,))(fc2_rot)
+
+        self.rotation = fc3_rot
+
+    def build_depth_architecture(self):
         # encoder
-        conv1 = self.conv_block(self.model_input, 32, 7)
+        conv1 = self.conv_block(self.left, 32, 7)
 
         conv2 = self.conv_block(conv1, 64, 5)
 
@@ -158,9 +196,11 @@ class UnDeepVOModel(object):
 
         # generate disparities
 
-        self.disparity_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1, 'disparity_left')
+        self.disparity_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1,
+                                                 'disparity_left')
 
-        self.disparity_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length, 1, 'disparity_right')
+        self.disparity_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length, 1,
+                                                  'disparity_right')
 
         # generate estimates of left and right images
 
@@ -170,21 +210,29 @@ class UnDeepVOModel(object):
 
         # generate left - right consistency
 
-        self.right_to_left_disparity = spatial_transformation([self.disparity_right, self.disparity_right], -1, 'r2l_disparity')
+        self.right_to_left_disparity = spatial_transformation([self.disparity_right, self.disparity_right], -1,
+                                                              'r2l_disparity')
 
-        self.left_to_right_disparity = spatial_transformation([self.disparity_left, self.disparity_left], 1, 'l2r_disparity')
+        self.left_to_right_disparity = spatial_transformation([self.disparity_left, self.disparity_left], 1,
+                                                              'l2r_disparity')
 
-        self.disparity_diff_left = disparity_difference([self.disparity_left, self.right_to_left_disparity], 'disp_diff_left')
+        self.disparity_diff_left = disparity_difference([self.disparity_left, self.right_to_left_disparity],
+                                                        'disp_diff_left')
 
-        self.disparity_diff_right = disparity_difference([self.disparity_right, self.left_to_right_disparity], 'disp_diff_right')
+        self.disparity_diff_right = disparity_difference([self.disparity_right, self.left_to_right_disparity],
+                                                         'disp_diff_right')
 
     def build_model(self):
-        self.model = Model(inputs=[self.left, self.right], outputs=[self.left_est,
-                                                                    self.right_est,
-                                                                    self.disparity_diff_left,
-                                                                    self.disparity_diff_right])
+        self.model = Model(inputs=[self.left_next, self.left, self.right], outputs=[self.left_est,
+                                                                                    self.right_est,
+                                                                                    self.disparity_diff_left,
+                                                                                    self.disparity_diff_right,
+                                                                                    self.translation,
+                                                                                    self.rotation])
         self.model.compile(loss=[photometric_consistency_loss(self.alpha_image_loss),
                                  photometric_consistency_loss(self.alpha_image_loss),
+                                 'mean_absolute_error',
+                                 'mean_absolute_error',
                                  'mean_absolute_error',
                                  'mean_absolute_error'],
                            optimizer=Adam(lr=self.lr),
