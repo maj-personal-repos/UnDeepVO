@@ -7,6 +7,7 @@ from losses import photometric_consistency_loss
 
 class UnDeepVOModel(object):
     def __init__(self, left_input, right_input, mode='train', lr=0.1, alpha_image_loss=0.85, img_rows=128, img_cols=512):
+        # NOTE: disparity calculation
         # depth = baseline * focal / disparity
         # depth = 0.54 * 721 / (1242 * disp)
 
@@ -20,11 +21,7 @@ class UnDeepVOModel(object):
 
         self.left = left_input
 
-        # self.left_cropped = Cropping2D(((13, 14), (0, 0)))(left_input)
-
         self.right = right_input
-
-        # self.right_cropped = Cropping2D(((13, 14), (0, 0)))(right_input)
 
         self.left_est = None
 
@@ -160,10 +157,6 @@ class UnDeepVOModel(object):
             return
 
         # generate disparities
-
-        # self.dp_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1, 'dp_left')
-
-        # self.dp_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length, 1, 'dp_right')
 
         self.disparity_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1, 'disparity_left')
 

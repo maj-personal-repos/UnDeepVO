@@ -1,8 +1,7 @@
-import os
-
+# uncomment this section to train on the CPU
+# import os
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-from keras.callbacks import TensorBoard
 from keras.layers import Input
 from image_loader import get_stereo_image_generators
 from undeepvo_model import UnDeepVOModel
@@ -69,6 +68,7 @@ def main(args):
     udvo = UnDeepVOModel(left_input, right_input, args.learning_rate)
 
     for epoch in range(epochs):
+        # TODO: need to save model after each epoch
         # model_path = os.path.join(models_dir, model_name + '_epoch_%d' % epoch)
 
         udvo.model.fit_generator(train_gen,

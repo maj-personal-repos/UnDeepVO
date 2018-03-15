@@ -36,36 +36,50 @@ root_dir = os.getcwd()
 
 for seq in train_sequences:
     l_dir = os.path.join(data_dir, 'dataset', 'sequences', seq, left_image_dir)
+
     r_dir = os.path.join(data_dir, 'dataset', 'sequences', seq, right_image_dir)
+
     for (_, _, left_filenames) in os.walk(l_dir):
         break
+
     for (_, _, right_filenames) in os.walk(r_dir):
         break
 
     for file in left_filenames:
         src_path = os.path.join(root_dir, l_dir, file)
+
         dst_path = os.path.join(train_dir, 'left', seq+file)
+
         os.symlink(src_path, dst_path)
 
     for file in right_filenames:
         src_path = os.path.join(root_dir, r_dir, file)
+
         dst_path = os.path.join(train_dir, 'right', seq+file)
+
         os.symlink(src_path, dst_path)
 
 for seq in test_sequences:
     l_dir = os.path.join(data_dir, 'dataset', 'sequences', seq, left_image_dir)
+
     r_dir = os.path.join(data_dir, 'dataset', 'sequences', seq, right_image_dir)
+
     for (_, _, left_filenames) in os.walk(l_dir):
         break
+
     for (_, _, right_filenames) in os.walk(r_dir):
         break
 
     for file in left_filenames:
         src_path = os.path.join(root_dir, l_dir, file)
+
         dst_path = os.path.join(test_dir, 'left', seq+file)
+
         os.symlink(src_path, dst_path)
 
     for file in right_filenames:
         src_path = os.path.join(root_dir, r_dir, file)
+
         dst_path = os.path.join(test_dir, 'right', seq+file)
+
         os.symlink(src_path, dst_path)
