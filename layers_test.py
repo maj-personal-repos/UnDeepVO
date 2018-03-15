@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 img_rows, img_cols = 128, 512
 
-image_generator = get_stereo_image_generators('data/dataset/sequences/02/', batch_size=1, shuffle=True)
-img = image_generator.__next__()
+train_gen, test_gen, train_samples, test_samples = get_stereo_image_generators('data/train/', 'data/test', batch_size=1, shuffle=True)
+img = train_gen.__next__()
 
 # spatial transformation lambda layer test
 
@@ -18,7 +18,7 @@ disparity = 0.1 * np.ones((1, img_rows, img_cols, 1))
 disparity = K.variable(disparity)
 left_image = K.variable(left_image)
 
-right_image = spatial_transformation([left_image, disparity], 1)
+right_image = spatial_transformation([left_image, disparity], 1, '')
 
 im_right = K.eval(right_image)
 plt.imshow(im_right[0])

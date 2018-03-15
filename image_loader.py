@@ -4,11 +4,12 @@ import numpy as np
 
 def get_stereo_image_generators(train_folder, test_folder, img_rows=128, img_cols=512, batch_size=16, shuffle=True):
     train_image_gen = ImageDataGenerator(rescale=1.0 / 255.0,
-                                         rotation_range=5,
-                                         shear_range=0.01,
-                                         zoom_range=0.01,
-                                         height_shift_range=0.01,
-                                         width_shift_range=0.01)
+                                         # rotation_range=5,
+                                         # shear_range=0.01,
+                                         # zoom_range=0.01,
+                                         # height_shift_range=0.01,
+                                         # width_shift_range=0.01
+                                         )
 
     test_image_gen = ImageDataGenerator(rescale=1.0 / 255.0)
 
@@ -56,8 +57,11 @@ def get_stereo_image_generators(train_folder, test_folder, img_rows=128, img_col
 
             yield [left_image, right_image], [left_image,
                                               right_image,
-                                              np.zeros(shape=left_image.shape),
-                                              np.zeros(shape=right_image.shape)]
+                                              np.zeros(
+                                                  (left_image.shape[0], left_image.shape[1], left_image.shape[2], 1)),
+                                              np.zeros((
+                                                       right_image.shape[0], right_image.shape[1], right_image.shape[2],
+                                                       1))]
 
     def test_generator_func():
         while True:
@@ -67,8 +71,11 @@ def get_stereo_image_generators(train_folder, test_folder, img_rows=128, img_col
 
             yield [left_image, right_image], [left_image,
                                               right_image,
-                                              np.zeros(shape=left_image.shape),
-                                              np.zeros(shape=right_image.shape)]
+                                              np.zeros(
+                                                  (left_image.shape[0], left_image.shape[1], left_image.shape[2], 1)),
+                                              np.zeros((
+                                                       right_image.shape[0], right_image.shape[1], right_image.shape[2],
+                                                       1))]
 
     train_generator = train_generator_func()
 

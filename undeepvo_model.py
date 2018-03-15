@@ -1,14 +1,18 @@
-from keras.optimizers import Adadelta
+from keras.optimizers import Adam
 from keras.models import Model
-from keras.layers import Conv2D, Conv2DTranspose, concatenate
+from keras.layers import Conv2D, Conv2DTranspose, concatenate, Cropping2D
 from layers import depth_to_disparity, disparity_difference, expand_dims, spatial_transformation
 from losses import photometric_consistency_loss
 
 
 class UnDeepVOModel(object):
-    def __init__(self, left_input, right_input, mode='train'):
+    def __init__(self, left_input, right_input, mode='train', lr=0.1, alpha_image_loss=0.85, img_rows=128, img_cols=512):
         # depth = baseline * focal / disparity
         # depth = 0.54 * 721 / (1242 * disp)
+
+        self.img_rows = img_rows
+
+        self.img_cols = img_cols
 
         self.baseline = 0.54  # meters
 
@@ -16,7 +20,11 @@ class UnDeepVOModel(object):
 
         self.left = left_input
 
+        # self.left_cropped = Cropping2D(((13, 14), (0, 0)))(left_input)
+
         self.right = right_input
+
+        # self.right_cropped = Cropping2D(((13, 14), (0, 0)))(right_input)
 
         self.left_est = None
 
@@ -47,6 +55,10 @@ class UnDeepVOModel(object):
         self.depthmap = None
 
         self.mode = mode
+
+        self.lr = lr
+
+        self.alpha_image_loss = alpha_image_loss
 
         self.build_architecture()
 
@@ -140,43 +152,48 @@ class UnDeepVOModel(object):
 
         # store depthmaps
 
-        self.depthmap_left = expand_dims(self.depthmap, 0)
+        self.depthmap_left = expand_dims(self.depthmap, 0, 'depth_map_exp_left')
 
-        self.depthmap_right = expand_dims(self.depthmap, 1)
+        self.depthmap_right = expand_dims(self.depthmap, 1, 'depth_map_exp_right')
 
         if self.mode == 'test':
             return
 
         # generate disparities
 
-        self.disparity_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length)
+        # self.dp_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1, 'dp_left')
 
-        self.disparity_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length)
+        # self.dp_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length, 1, 'dp_right')
+
+        self.disparity_left = depth_to_disparity(self.depthmap_left, self.baseline, self.focal_length, 1, 'disparity_left')
+
+        self.disparity_right = depth_to_disparity(self.depthmap_right, self.baseline, self.focal_length, 1, 'disparity_right')
 
         # generate estimates of left and right images
 
-        self.left_est = spatial_transformation([self.right, self.disparity_left], -1)
+        self.left_est = spatial_transformation([self.right, self.disparity_right], -1, 'left_est')
 
-        self.right_est = spatial_transformation([self.left, self.disparity_right], 1)
+        self.right_est = spatial_transformation([self.left, self.disparity_left], 1, 'right_est')
 
         # generate left - right consistency
 
-        self.right_to_left_disparity = spatial_transformation([self.disparity_right, self.disparity_left], -1)
+        self.right_to_left_disparity = spatial_transformation([self.disparity_right, self.disparity_right], -1, 'r2l_disparity')
 
-        self.left_to_right_disparity = spatial_transformation([self.disparity_left, self.disparity_right], 1)
+        self.left_to_right_disparity = spatial_transformation([self.disparity_left, self.disparity_left], 1, 'l2r_disparity')
 
-        self.disparity_diff_left = disparity_difference([self.disparity_left, self.right_to_left_disparity])
+        self.disparity_diff_left = disparity_difference([self.disparity_left, self.right_to_left_disparity], 'disp_diff_left')
 
-        self.disparity_diff_right = disparity_difference([self.disparity_right, self.left_to_right_disparity])
+        self.disparity_diff_right = disparity_difference([self.disparity_right, self.left_to_right_disparity], 'disp_diff_right')
 
     def build_model(self):
         self.model = Model(inputs=[self.left, self.right], outputs=[self.left_est,
                                                                     self.right_est,
                                                                     self.disparity_diff_left,
                                                                     self.disparity_diff_right])
-        self.model.compile(loss=[photometric_consistency_loss,
-                                 photometric_consistency_loss,
+        self.model.compile(loss=[photometric_consistency_loss(self.alpha_image_loss),
+                                 photometric_consistency_loss(self.alpha_image_loss),
                                  'mean_absolute_error',
                                  'mean_absolute_error'],
-                           optimizer=Adadelta(),
-                           metrics=['accuracy'])
+                           optimizer=Adam(lr=self.lr),
+                           # metrics=['accuracy']
+                           )
