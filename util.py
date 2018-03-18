@@ -2,6 +2,9 @@ from __future__ import absolute_import, division, print_function
 import tensorflow as tf
 
 
+def warp(image, depthmap, transformation, K):
+    pass
+
 def spatial_transform(input_images, x_offset, wrap_mode='border', name='bilinear_sampler', **kwargs):
     def _repeat(x, n_repeats):
         with tf.variable_scope('_repeat'):

@@ -104,17 +104,17 @@ class UnDeepVOModel(object):
     def build_pose_architecture(self):
         input = concatenate([self.left, self.left_next], axis=3)
 
-        conv1 = self.conv(input, 16, 7, 2, activation='relu')
+        conv1 = self.conv(input, 16, 7, 1, activation='relu')
 
-        conv2 = self.conv(conv1, 32, 5, 2, activation='relu')
+        conv2 = self.conv(conv1, 32, 5, 1, activation='relu')
 
-        conv3 = self.conv(conv2, 64, 3, 2, activation='relu')
+        conv3 = self.conv(conv2, 64, 3, 1, activation='relu')
 
-        conv4 = self.conv(conv3, 128, 3, 2, activation='relu')
+        conv4 = self.conv(conv3, 128, 3, 1, activation='relu')
 
-        conv5 = self.conv(conv4, 256, 3, 2, activation='relu')
+        conv5 = self.conv(conv4, 256, 3, 1, activation='relu')
 
-        conv6 = self.conv(conv5, 512, 3, 2, activation='relu')
+        conv6 = self.conv(conv5, 512, 3, 1, activation='relu')
 
         flat1 = Flatten()(conv6)
 

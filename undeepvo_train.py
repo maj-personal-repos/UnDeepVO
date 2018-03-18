@@ -2,7 +2,7 @@
 # import os
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-# from keras.utils import plot_model
+from keras.utils import plot_model
 from keras.layers import Input
 from image_loader import get_stereo_image_generators
 from undeepvo_model import UnDeepVOModel
@@ -87,9 +87,9 @@ def main(args):
     #                              #                        write_grads=True)]
     #                              )
 
-    # udvo.model.summary()
+    udvo.model.summary()
 
-    # plot_model(udvo.model, show_shapes=True, to_file='scratch/model.png')
+    plot_model(udvo.model, show_shapes=True, to_file='scratch/model.png')
 
 
 if __name__ == '__main__':
