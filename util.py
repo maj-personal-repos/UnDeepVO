@@ -1,11 +1,10 @@
 from __future__ import absolute_import, division, print_function
-import tensorflow as tf
 import numpy as np
 from math import sin, cos
 from keras import backend as K
 
 
-def eul2rotm(theta):
+def euler_to_rotation(theta):
     R_x = np.array([[1, 0, 0],
                     [0, cos(theta[0]), -sin(theta[0])],
                     [0, sin(theta[0]), cos(theta[0])]
@@ -30,17 +29,23 @@ def eul2rotm(theta):
     return output
 
 
-def pos2transm(X):
-    M = np.identity(4)
-    M[:3, 3] = X[:3]
-    return M
+def position_to_translation(position):
+    translation_mat = np.identity(4)
+
+    translation_mat[:3, 3] = position[:3]
+
+    return translation_mat
 
 
 def warp(image, depthmap, pose, K):
     image_shape = K.shape(image)
+
     num_batch = image_shape[0]
+
     height = image_shape[1]
+
     width = image_shape[2]
+
     channels = image_shape[3]
 
 

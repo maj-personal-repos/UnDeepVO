@@ -1,14 +1,14 @@
 import pykitti
 from math import pi
-from util import eul2rotm, pos2transm
+from util import euler_to_rotation, position_to_translation
 import numpy as np
 
 dataset = pykitti.odometry('data/dataset', '01')
 
 
-rotm = eul2rotm([0, 0, pi/4])
+rotm = euler_to_rotation([0, 0, pi / 4])
 
-transm = pos2transm([1, 1, 0])
+transm = position_to_translation([1, 1, 0])
 
 K = dataset.calib.K_cam2
 
