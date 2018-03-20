@@ -1,119 +1,153 @@
 from __future__ import absolute_import, division, print_function
 import tensorflow as tf
+import numpy as np
+from math import sin, cos
+from keras import backend as K
 
 
-def warp(image, depthmap, transformation, K):
-    pass
+def eul2rotm(theta):
+    R_x = np.array([[1, 0, 0],
+                    [0, cos(theta[0]), -sin(theta[0])],
+                    [0, sin(theta[0]), cos(theta[0])]
+                    ])
+
+    R_y = np.array([[cos(theta[1]), 0, sin(theta[1])],
+                    [0, 1, 0],
+                    [-sin(theta[1]), 0, cos(theta[1])]
+                    ])
+
+    R_z = np.array([[cos(theta[2]), -sin(theta[2]), 0],
+                    [sin(theta[2]), cos(theta[2]), 0],
+                    [0, 0, 1]
+                    ])
+
+    R = np.dot(R_z, np.dot(R_y, R_x))
+
+    output = np.identity(4)
+
+    output[:3, :3] = R
+
+    return output
+
+
+def pos2transm(X):
+    M = np.identity(4)
+    M[:3, 3] = X[:3]
+    return M
+
+
+def warp(image, depthmap, pose, K):
+    image_shape = K.shape(image)
+    num_batch = image_shape[0]
+    height = image_shape[1]
+    width = image_shape[2]
+    channels = image_shape[3]
+
 
 def spatial_transform(input_images, x_offset, wrap_mode='border', name='bilinear_sampler', **kwargs):
     def _repeat(x, n_repeats):
-        with tf.variable_scope('_repeat'):
-            rep = tf.tile(tf.expand_dims(x, 1), [1, n_repeats])
+        rep = K.tile(K.expand_dims(x, 1), [1, n_repeats])
 
-            return tf.reshape(rep, [-1])
+        return rep
 
     def _interpolate(im, x, y):
-        with tf.variable_scope('_interpolate'):
+        _edge_size = 0
 
-            # handle both texture border types
+        if _wrap_mode == 'border':
+            _edge_size = 1
+
+            im = K.spatial_2d_padding(im, padding=((1, 1), (1, 1)))
+
+            x = x + _edge_size
+
+            y = y + _edge_size
+
+        elif _wrap_mode == 'edge':
             _edge_size = 0
-            if _wrap_mode == 'border':
-                _edge_size = 1
 
-                im = tf.pad(im, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='CONSTANT')
+        else:
+            return None
 
-                x = x + _edge_size
+        x = K.clip(x, 0.0, K.eval(_width_f) - 1 + 2 * _edge_size)
 
-                y = y + _edge_size
+        x0_f = K.round(x)
 
-            elif _wrap_mode == 'edge':
-                _edge_size = 0
+        y0_f = K.round(y)
 
-            else:
-                return None
+        x1_f = x0_f + 1
 
-            x = tf.clip_by_value(x, 0.0, _width_f - 1 + 2 * _edge_size)
+        x0 = K.cast(x0_f, 'int32')
 
-            x0_f = tf.floor(x)
+        y0 = K.cast(y0_f, 'int32')
 
-            y0_f = tf.floor(y)
+        x1 = K.cast(K.minimum(x1_f, K.eval(_width_f) - 1 + 2 * _edge_size), 'int32')
 
-            x1_f = x0_f + 1
+        dim2 = (_width + 2 * _edge_size)
 
-            x0 = tf.cast(x0_f, tf.int32)
+        dim1 = (_width + 2 * _edge_size) * (_height + 2 * _edge_size)
 
-            y0 = tf.cast(y0_f, tf.int32)
+        base = _repeat(K.arange(_num_batch) * dim1, _height * _width)
 
-            x1 = tf.cast(tf.minimum(x1_f, _width_f - 1 + 2 * _edge_size), tf.int32)
+        base_y0 = base + y0 * dim2
 
-            dim2 = (_width + 2 * _edge_size)
+        idx_l = base_y0 + x0
 
-            dim1 = (_width + 2 * _edge_size) * (_height + 2 * _edge_size)
+        idx_r = base_y0 + x1
 
-            base = _repeat(tf.range(_num_batch) * dim1, _height * _width)
+        im_flat = K.reshape(im, K.stack([-1, _num_channels]))
 
-            base_y0 = base + y0 * dim2
+        pix_l = K.gather(im_flat, idx_l)
 
-            idx_l = base_y0 + x0
+        pix_r = K.gather(im_flat, idx_r)
 
-            idx_r = base_y0 + x1
+        weight_l = K.expand_dims(x1_f - x, 1)
 
-            im_flat = tf.reshape(im, tf.stack([-1, _num_channels]))
+        weight_r = K.expand_dims(x - x0_f, 1)
 
-            pix_l = tf.gather(im_flat, idx_l)
-
-            pix_r = tf.gather(im_flat, idx_r)
-
-            weight_l = tf.expand_dims(x1_f - x, 1)
-
-            weight_r = tf.expand_dims(x - x0_f, 1)
-
-            return weight_l * pix_l + weight_r * pix_r
+        return weight_l * pix_l + weight_r * pix_r
 
     def _transform(input_images, x_offset):
-        with tf.variable_scope('transform'):
-            # grid of (x_t, y_t, 1), eq (1) in ref [1]
+        x_t, y_t = np.meshgrid(np.linspace(0.0, K.eval(_width_f) - 1.0, K.eval(_width)),
+                               np.linspace(0.0, K.eval(_height_f) - 1.0, K.eval(_height)))
 
-            x_t, y_t = tf.meshgrid(tf.linspace(0.0, _width_f - 1.0, _width),
-                                   tf.linspace(0.0, _height_f - 1.0, _height))
+        x_t = K.variable(x_t)
 
-            x_t_flat = tf.reshape(x_t, (1, -1))
+        y_t = K.variable(y_t)
 
-            y_t_flat = tf.reshape(y_t, (1, -1))
+        x_t_flat = K.reshape(x_t, (1, -1))
 
-            x_t_flat = tf.tile(x_t_flat, tf.stack([_num_batch, 1]))
+        y_t_flat = K.reshape(y_t, (1, -1))
 
-            y_t_flat = tf.tile(y_t_flat, tf.stack([_num_batch, 1]))
+        x_t_flat = K.tile(x_t_flat, K.stack([_num_batch, 1]))
 
-            x_t_flat = tf.reshape(x_t_flat, [-1])
+        y_t_flat = K.tile(y_t_flat, K.stack([_num_batch, 1]))
 
-            y_t_flat = tf.reshape(y_t_flat, [-1])
+        x_t_flat = K.reshape(x_t_flat, [-1])
 
-            x_t_flat = x_t_flat + tf.reshape(x_offset, [-1]) * _width_f
+        y_t_flat = K.reshape(y_t_flat, [-1])
 
-            input_transformed = _interpolate(input_images, x_t_flat, y_t_flat)
+        x_t_flat = x_t_flat + K.reshape(x_offset, [-1]) * _width_f
 
-            output = tf.reshape(input_transformed, tf.stack([_num_batch, _height, _width, _num_channels]))
+        input_transformed = _interpolate(input_images, x_t_flat, y_t_flat)
 
-            return output
-
-    with tf.variable_scope(name):
-        _num_batch = tf.shape(input_images)[0]
-
-        _height = tf.shape(input_images)[1]
-
-        _width = tf.shape(input_images)[2]
-
-        _num_channels = tf.shape(input_images)[3]
-
-        _height_f = tf.cast(_height, tf.float32)
-
-        _width_f = tf.cast(_width, tf.float32)
-
-        _wrap_mode = wrap_mode
-
-        output = _transform(input_images, x_offset)
+        output = K.reshape(input_transformed, K.stack([_num_batch, _height, _width, _num_channels]))
 
         return output
 
+    _num_batch = K.shape(input_images)[0]
 
+    _height = K.shape(input_images)[1]
+
+    _width = K.shape(input_images)[2]
+
+    _num_channels = K.shape(input_images)[3]
+
+    _height_f = K.cast(_height, 'float32')
+
+    _width_f = K.cast(_width, 'float32')
+
+    _wrap_mode = wrap_mode
+
+    output = _transform(input_images, x_offset)
+
+    return output
